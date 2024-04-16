@@ -42,9 +42,8 @@ def check_tokens():
     missing_tokens = []
     for token_name, token_value in ENV_TOKENS.items():
         if token_value is None:
-            missing_tokens.append(token_name)
-        else:
-            logging.info(f'Токен {token_name} успешно проверен.')
+            missing_tokens.append(
+                f'Отсутствует переменная окружения: "{token_name}"')
     return missing_tokens
 
 
@@ -110,40 +109,34 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    logging.info('Бот запущен')
     missing_tokens = check_tokens()
     if missing_tokens:
-        for token_name in missing_tokens:
-            logging.critical(
-                f'Отсутствует переменная окружения: "{token_name}"')
+        error_message = '\n'.join(missing_tokens)
+        logging.critical(error_message)
         sys.exit('Ошибка: Токены не прошли валидацию')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    logging.info('Бот запущен')
     timestamp = int(time.time())
     last_status = None
+    status_message = None
 
     while True:
         try:
             response = get_api_answer(timestamp)
-            homework = check_response(response)
+            homeworks = check_response(response)
             homeworks = response.get('homeworks')
             if homeworks:
-                homework = homeworks[0]
-                try:
-                    status_message = parse_status(homework)
-                    if status_message != last_status:
-                        send_message(bot, status_message)
-                        logging.info('Статус изменился')
-                        last_status = status_message
-                except Exception as parse_error:
-                    logging.error(f'Ошибка при обработке статуса'
-                                  f' домашней работы: {parse_error}')
+                status_message = parse_status(homeworks[0])
+            if status_message != last_status:
+                send_message(bot, status_message)
+                logging.info('Статус изменился')
+                last_status = status_message
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             send_message(bot, message)
         finally:
             logging.info('Программа завершена')
-
-        time.sleep(RETRY_PERIOD)
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
